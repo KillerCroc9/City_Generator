@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Generator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏙️ City Generator</h1>
+            <p class="subtitle">Generate unique city layouts based on real-world inspiration</p>
+        </header>
+
+        <div class="controls">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="cityPrompt" 
+                    placeholder="Enter a city name (e.g., Texas, New York, Tokyo)..." 
+                    autocomplete="off"
+                >
+                <button id="generateBtn" class="btn-primary">Generate City</button>
+            </div>
+
+            <div class="options">
+                <div class="option-group">
+                    <label>
+                        <input type="radio" name="viewMode" value="2d" checked>
+                        <span>2D Grid View</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="viewMode" value="3d">
+                        <span>3D Isometric View</span>
+                    </label>
+                </div>
+
+                <div class="grid-size">
+                    <label for="gridSize">Grid Size:</label>
+                    <input type="range" id="gridSize" min="10" max="30" value="20">
+                    <span id="gridSizeValue">20x20</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="cityInfo" class="city-info hidden">
+            <h3>City: <span id="cityName"></span></h3>
+            <div class="characteristics">
+                <div class="char-item">
+                    <span class="label">Density:</span>
+                    <span id="densityValue"></span>
+                </div>
+                <div class="char-item">
+                    <span class="label">Style:</span>
+                    <span id="styleValue"></span>
+                </div>
+                <div class="char-item">
+                    <span class="label">Average Height:</span>
+                    <span id="heightValue"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="cityCanvas"></canvas>
+        </div>
+
+        <div class="legend">
+            <h4>Legend</h4>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #4a5568;"></div>
+                    <span>Residential</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2d3748;"></div>
+                    <span>Commercial</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #1a202c;"></div>
+                    <span>Skyscraper</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #48bb78;"></div>
+                    <span>Park</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #cbd5e0;"></div>
+                    <span>Road</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="cityGenerator.js"></script>
+</body>
+</html>
