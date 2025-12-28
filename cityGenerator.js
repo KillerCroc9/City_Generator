@@ -1,5 +1,9 @@
 // City Generator Logic
 class CityGenerator {
+    // Constants for color variance hash function
+    static COLOR_HASH_PRIME_X = 73;
+    static COLOR_HASH_PRIME_Y = 149;
+    
     constructor() {
         this.canvas = document.getElementById('cityCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -7,6 +11,7 @@ class CityGenerator {
         this.cellSize = 25;
         this.viewMode = '2d';
         this.cityData = null;
+        this.colorSeed = Math.random() * 1000; // Initialize once for deterministic colors
         
         this.init();
     }
@@ -168,9 +173,6 @@ class CityGenerator {
     createCityGrid(characteristics) {
         const grid = [];
         const { density, avgHeight, parkRatio, skyscraperRatio, roadPattern } = characteristics;
-        
-        // Store a seed for color variance consistency
-        this.colorSeed = Math.random() * 1000;
 
         for (let y = 0; y < this.gridSize; y++) {
             const row = [];
@@ -492,8 +494,14 @@ class CityGenerator {
     }
     
     varyColor(color, variance, x, y) {
+        // Validate hex color format
+        if (!color || !color.match(/^#[0-9A-Fa-f]{6}$/)) {
+            console.warn(`Invalid hex color: ${color}, using default`);
+            return color || '#e2e8f0';
+        }
+        
         // Create deterministic pseudorandom values based on position and seed
-        const hash = (this.colorSeed + x * 73 + y * 149) % 1000;
+        const hash = (this.colorSeed + x * CityGenerator.COLOR_HASH_PRIME_X + y * CityGenerator.COLOR_HASH_PRIME_Y) % 1000;
         const rand1 = (Math.sin(hash * 0.1) * 0.5 + 0.5);
         const rand2 = (Math.sin(hash * 0.2) * 0.5 + 0.5);
         const rand3 = (Math.sin(hash * 0.3) * 0.5 + 0.5);
