@@ -312,3 +312,60 @@ h1 {
     height: 18px;
     cursor: pointer;
 }
+
+.camera-controls {
+    margin-top: 15px;
+    background: #f7fafc;
+    border-radius: 10px;
+    padding: 15px;
+    transition: all 0.3s;
+}
+
+.camera-controls.hidden {
+    display: none;
+}
+
+.camera-controls h4 {
+    margin-bottom: 10px;
+    color: #2d3748;
+    font-size: 1rem;
+}
+
+.camera-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.camera-preset {
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.camera-preset:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.camera-preset:active {
+    transform: translateY(0);
+}
+
+.camera-info {
+    color: #718096;
+    font-size: 0.85rem;
+}
+
+.camera-info small {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
