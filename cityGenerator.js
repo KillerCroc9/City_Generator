@@ -497,7 +497,7 @@ class CityGenerator {
         // Validate hex color format
         if (!color || !color.match(/^#[0-9A-Fa-f]{6}$/)) {
             console.warn(`Invalid hex color: ${color}, using default`);
-            return color || '#e2e8f0';
+            return '#e2e8f0';
         }
         
         // Create deterministic pseudorandom values based on position and seed
@@ -514,6 +514,12 @@ class CityGenerator {
     }
 
     lightenColor(color, percent) {
+        // Validate hex color format
+        if (!color || !color.match(/^#[0-9A-Fa-f]{6}$/)) {
+            console.warn(`Invalid hex color in lightenColor: ${color}, using default`);
+            return '#e2e8f0';
+        }
+        
         const num = parseInt(color.replace('#', ''), 16);
         const amt = Math.round(2.55 * percent);
         const R = Math.min(255, (num >> 16) + amt);
@@ -523,6 +529,12 @@ class CityGenerator {
     }
 
     darkenColor(color, percent) {
+        // Validate hex color format
+        if (!color || !color.match(/^#[0-9A-Fa-f]{6}$/)) {
+            console.warn(`Invalid hex color in darkenColor: ${color}, using default`);
+            return '#e2e8f0';
+        }
+        
         const num = parseInt(color.replace('#', ''), 16);
         const amt = Math.round(2.55 * percent);
         const R = Math.max(0, (num >> 16) - amt);
