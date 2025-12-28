@@ -168,6 +168,9 @@ class CityGenerator {
     createCityGrid(characteristics) {
         const grid = [];
         const { density, avgHeight, parkRatio, skyscraperRatio, roadPattern } = characteristics;
+        
+        // Store a seed for color variance consistency
+        this.colorSeed = Math.random() * 1000;
 
         for (let y = 0; y < this.gridSize; y++) {
             const row = [];
@@ -258,9 +261,9 @@ class CityGenerator {
                 const posX = x * cellSize;
                 const posY = y * cellSize;
 
-                // Draw cell with color variance
+                // Draw cell with deterministic color variance based on position
                 const variance = cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park' ? 20 : 0;
-                this.ctx.fillStyle = this.getCellColor(cell, variance);
+                this.ctx.fillStyle = this.getCellColor(cell, variance, x, y);
                 this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
 
                 // Add lighting and shader effects for buildings
@@ -342,7 +345,7 @@ class CityGenerator {
                 } else {
                     // Draw building with height and lighting
                     const variance = 20;
-                    const color = this.getCellColor(cell, variance);
+                    const color = this.getCellColor(cell, variance, x, y);
                     const height = cell.height * cellSize * 0.3;
                     this.drawIsoBuilding(drawX, drawY, cellSize, color, height);
                 }
@@ -451,7 +454,7 @@ class CityGenerator {
         this.ctx.fill();
     }
 
-    getCellColor(cell, variance = 0) {
+    getCellColor(cell, variance = 0, x = 0, y = 0) {
         let baseColor;
         switch (cell.type) {
             case 'residential': 
@@ -480,19 +483,25 @@ class CityGenerator {
                 baseColor = '#e2e8f0';
         }
         
-        // Add color variance to make buildings look unique
-        if (variance !== 0 && cell.type !== 'road' && cell.type !== 'empty') {
-            return this.varyColor(baseColor, variance);
+        // Add deterministic color variance to make buildings look unique
+        if (variance !== 0 && cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park') {
+            return this.varyColor(baseColor, variance, x, y);
         }
         
         return baseColor;
     }
     
-    varyColor(color, variance) {
+    varyColor(color, variance, x, y) {
+        // Create deterministic pseudorandom values based on position and seed
+        const hash = (this.colorSeed + x * 73 + y * 149) % 1000;
+        const rand1 = (Math.sin(hash * 0.1) * 0.5 + 0.5);
+        const rand2 = (Math.sin(hash * 0.2) * 0.5 + 0.5);
+        const rand3 = (Math.sin(hash * 0.3) * 0.5 + 0.5);
+        
         const num = parseInt(color.replace('#', ''), 16);
-        const R = Math.max(0, Math.min(255, (num >> 16) + (Math.random() - 0.5) * variance));
-        const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + (Math.random() - 0.5) * variance));
-        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + (Math.random() - 0.5) * variance));
+        const R = Math.max(0, Math.min(255, (num >> 16) + (rand1 - 0.5) * variance));
+        const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + (rand2 - 0.5) * variance));
+        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + (rand3 - 0.5) * variance));
         return '#' + (0x1000000 + Math.floor(R) * 0x10000 + Math.floor(G) * 0x100 + Math.floor(B)).toString(16).slice(1);
     }
 
