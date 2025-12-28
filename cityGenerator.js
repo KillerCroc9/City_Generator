@@ -13,6 +13,15 @@ class CityGenerator {
         this.cityData = null;
         this.colorSeed = Math.random() * 1000; // Initialize once for deterministic colors
         
+        // New properties for advanced features
+        this.mapShape = 'square';
+        this.waterDensity = 0.15;
+        this.timeOfDay = 12; // 0-24 hours
+        this.animateSky = true;
+        this.weather = 'clear';
+        this.skyAnimationTime = 0;
+        this.animationFrame = null;
+        
         this.init();
     }
 
@@ -36,6 +45,42 @@ class CityGenerator {
             if (this.cityData) {
                 this.generateCity();
             }
+        });
+
+        // New advanced options event listeners
+        document.getElementById('mapShape').addEventListener('change', (e) => {
+            this.mapShape = e.target.value;
+            if (this.cityData) this.generateCity();
+        });
+
+        document.getElementById('waterDensity').addEventListener('input', (e) => {
+            this.waterDensity = parseInt(e.target.value) / 100;
+            document.getElementById('waterDensityValue').textContent = `${e.target.value}%`;
+            if (this.cityData) this.generateCity();
+        });
+
+        document.getElementById('timeOfDay').addEventListener('input', (e) => {
+            this.timeOfDay = parseFloat(e.target.value);
+            const hours = Math.floor(this.timeOfDay);
+            const minutes = Math.floor((this.timeOfDay % 1) * 60);
+            const timeStr = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            const period = hours < 6 ? ' (Night)' : hours < 12 ? ' (Morning)' : hours < 18 ? ' (Afternoon)' : ' (Evening)';
+            document.getElementById('timeOfDayValue').textContent = timeStr + period;
+            if (this.cityData) this.renderCity();
+        });
+
+        document.getElementById('animateSky').addEventListener('change', (e) => {
+            this.animateSky = e.target.checked;
+            if (this.animateSky && this.cityData) {
+                this.startSkyAnimation();
+            } else {
+                this.stopSkyAnimation();
+            }
+        });
+
+        document.getElementById('weather').addEventListener('change', (e) => {
+            this.weather = e.target.value;
+            if (this.cityData) this.renderCity();
         });
 
         this.resizeCanvas();
@@ -174,9 +219,43 @@ class CityGenerator {
         const grid = [];
         const { density, avgHeight, parkRatio, skyscraperRatio, roadPattern } = characteristics;
 
+        // First, determine map boundaries based on shape
+        const isInBounds = (x, y) => {
+            const centerX = this.gridSize / 2;
+            const centerY = this.gridSize / 2;
+            const dist = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+            const maxDist = this.gridSize / 2;
+            
+            switch (this.mapShape) {
+                case 'circle':
+                    return dist < maxDist * 0.9;
+                case 'coastal':
+                    return x > this.gridSize * 0.2; // Cut off left side for ocean
+                case 'river':
+                    return true; // River goes through the map
+                default:
+                    return true; // Square - all cells in bounds
+            }
+        };
+
+        // Generate water features first
+        const waterMap = this.generateWaterFeatures();
+
         for (let y = 0; y < this.gridSize; y++) {
             const row = [];
             for (let x = 0; x < this.gridSize; x++) {
+                // Check if cell is out of bounds for current shape
+                if (!isInBounds(x, y)) {
+                    row.push({ type: 'water', height: 0, waterType: 'ocean' });
+                    continue;
+                }
+
+                // Check if cell is water from water generation
+                if (waterMap[y][x]) {
+                    row.push({ type: 'water', height: 0, waterType: waterMap[y][x] });
+                    continue;
+                }
+
                 // Determine if this cell is a road
                 let isRoad = false;
                 if (roadPattern === 'grid') {
@@ -232,6 +311,75 @@ class CityGenerator {
         return grid;
     }
 
+    generateWaterFeatures() {
+        // Create a 2D array to track water cells
+        const waterMap = Array(this.gridSize).fill(null).map(() => Array(this.gridSize).fill(null));
+        
+        if (this.waterDensity === 0) return waterMap;
+
+        const centerX = Math.floor(this.gridSize / 2);
+        const centerY = Math.floor(this.gridSize / 2);
+
+        switch (this.mapShape) {
+            case 'circle':
+            case 'square':
+                // Add random lakes
+                const numLakes = Math.floor(this.waterDensity * 3);
+                for (let i = 0; i < numLakes; i++) {
+                    const lakeX = Math.floor(Math.random() * this.gridSize);
+                    const lakeY = Math.floor(Math.random() * this.gridSize);
+                    const lakeSize = Math.floor(2 + Math.random() * 3);
+                    
+                    for (let dy = -lakeSize; dy <= lakeSize; dy++) {
+                        for (let dx = -lakeSize; dx <= lakeSize; dx++) {
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < lakeSize) {
+                                const y = lakeY + dy;
+                                const x = lakeX + dx;
+                                if (y >= 0 && y < this.gridSize && x >= 0 && x < this.gridSize) {
+                                    waterMap[y][x] = 'lake';
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+
+            case 'coastal':
+                // Add ocean on the left side
+                const oceanWidth = Math.floor(this.gridSize * 0.2);
+                for (let y = 0; y < this.gridSize; y++) {
+                    for (let x = 0; x < oceanWidth; x++) {
+                        waterMap[y][x] = 'ocean';
+                    }
+                }
+                break;
+
+            case 'river':
+                // Add a winding river through the map
+                let riverY = centerY;
+                for (let x = 0; x < this.gridSize; x++) {
+                    const riverWidth = 2 + Math.floor(this.waterDensity * 3);
+                    
+                    // Make river wind
+                    if (x % 3 === 0) {
+                        riverY += Math.floor(Math.random() * 3) - 1;
+                        riverY = Math.max(2, Math.min(this.gridSize - 3, riverY));
+                    }
+                    
+                    for (let dy = -riverWidth; dy <= riverWidth; dy++) {
+                        const y = riverY + dy;
+                        if (y >= 0 && y < this.gridSize) {
+                            waterMap[y][x] = 'river';
+                        }
+                    }
+                }
+                break;
+        }
+
+        return waterMap;
+    }
+
     updateCityInfo(name, characteristics) {
         const infoDiv = document.getElementById('cityInfo');
         infoDiv.classList.remove('hidden');
@@ -247,10 +395,235 @@ class CityGenerator {
 
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // Draw sky first
+        this.drawSky();
+
         if (this.viewMode === '2d') {
             this.render2D();
         } else {
             this.render3D();
+        }
+    }
+
+    startSkyAnimation() {
+        if (this.animationFrame) return; // Already animating
+        
+        const animate = () => {
+            this.skyAnimationTime += 0.01;
+            this.renderCity();
+            this.animationFrame = requestAnimationFrame(animate);
+        };
+        
+        animate();
+    }
+
+    stopSkyAnimation() {
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = null;
+        }
+    }
+
+    drawSky() {
+        // Get sky colors based on time of day
+        const skyColors = this.getSkyColors(this.timeOfDay);
+        
+        // Create gradient sky
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, skyColors.top);
+        gradient.addColorStop(0.5, skyColors.middle);
+        gradient.addColorStop(1, skyColors.bottom);
+        
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Draw sun or moon
+        this.drawCelestialBody();
+        
+        // Draw clouds if weather is cloudy or rainy
+        if (this.weather === 'cloudy' || this.weather === 'rainy') {
+            this.drawClouds();
+        }
+        
+        // Draw rain if weather is rainy
+        if (this.weather === 'rainy') {
+            this.drawRain();
+        }
+    }
+
+    getSkyColors(time) {
+        // Normalize time to 0-24
+        const t = time % 24;
+        
+        // Define colors for different times of day
+        if (t < 5) {
+            // Night (0-5)
+            return {
+                top: '#0a1628',
+                middle: '#1a2642',
+                bottom: '#2d3e5f'
+            };
+        } else if (t < 7) {
+            // Dawn (5-7)
+            const progress = (t - 5) / 2;
+            return {
+                top: this.interpolateColor('#0a1628', '#4a6fa5', progress),
+                middle: this.interpolateColor('#1a2642', '#87CEEB', progress),
+                bottom: this.interpolateColor('#2d3e5f', '#FFB347', progress)
+            };
+        } else if (t < 17) {
+            // Day (7-17)
+            return {
+                top: '#4a6fa5',
+                middle: '#87CEEB',
+                bottom: '#b8d8f0'
+            };
+        } else if (t < 19) {
+            // Dusk (17-19)
+            const progress = (t - 17) / 2;
+            return {
+                top: this.interpolateColor('#4a6fa5', '#2d3e5f', progress),
+                middle: this.interpolateColor('#87CEEB', '#ff6b35', progress),
+                bottom: this.interpolateColor('#b8d8f0', '#ffb347', progress)
+            };
+        } else {
+            // Evening/Night (19-24)
+            const progress = (t - 19) / 5;
+            return {
+                top: this.interpolateColor('#2d3e5f', '#0a1628', progress),
+                middle: this.interpolateColor('#ff6b35', '#1a2642', progress),
+                bottom: this.interpolateColor('#ffb347', '#2d3e5f', progress)
+            };
+        }
+    }
+
+    interpolateColor(color1, color2, factor) {
+        const c1 = parseInt(color1.slice(1), 16);
+        const c2 = parseInt(color2.slice(1), 16);
+        
+        const r1 = (c1 >> 16) & 0xff;
+        const g1 = (c1 >> 8) & 0xff;
+        const b1 = c1 & 0xff;
+        
+        const r2 = (c2 >> 16) & 0xff;
+        const g2 = (c2 >> 8) & 0xff;
+        const b2 = c2 & 0xff;
+        
+        const r = Math.round(r1 + (r2 - r1) * factor);
+        const g = Math.round(g1 + (g2 - g1) * factor);
+        const b = Math.round(b1 + (b2 - b1) * factor);
+        
+        return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+    }
+
+    drawCelestialBody() {
+        const t = this.timeOfDay % 24;
+        const isNight = t < 6 || t > 20;
+        
+        // Calculate position based on time
+        const progress = isNight ? ((t + 6) % 24) / 12 : t / 12;
+        const angle = Math.PI * progress;
+        
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height;
+        const radius = this.canvas.width * 0.6;
+        
+        const x = centerX + Math.cos(angle - Math.PI) * radius;
+        const y = centerY - Math.sin(angle - Math.PI) * radius;
+        
+        // Only draw if above horizon
+        if (y < this.canvas.height * 0.8) {
+            if (isNight) {
+                // Draw moon
+                const moonSize = 30;
+                this.ctx.fillStyle = '#f0f0f0';
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, moonSize, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Add moon glow
+                const moonGlow = this.ctx.createRadialGradient(x, y, moonSize, x, y, moonSize * 2);
+                moonGlow.addColorStop(0, 'rgba(240, 240, 240, 0.3)');
+                moonGlow.addColorStop(1, 'rgba(240, 240, 240, 0)');
+                this.ctx.fillStyle = moonGlow;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, moonSize * 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Add craters
+                this.ctx.fillStyle = 'rgba(200, 200, 200, 0.3)';
+                this.ctx.beginPath();
+                this.ctx.arc(x - 8, y - 5, 5, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.beginPath();
+                this.ctx.arc(x + 6, y + 3, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+            } else {
+                // Draw sun
+                const sunSize = 40;
+                
+                // Sun glow
+                const sunGlow = this.ctx.createRadialGradient(x, y, sunSize * 0.5, x, y, sunSize * 2);
+                sunGlow.addColorStop(0, 'rgba(255, 220, 100, 0.8)');
+                sunGlow.addColorStop(0.5, 'rgba(255, 200, 50, 0.4)');
+                sunGlow.addColorStop(1, 'rgba(255, 180, 0, 0)');
+                this.ctx.fillStyle = sunGlow;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, sunSize * 2, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Sun body
+                this.ctx.fillStyle = '#FDB813';
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, sunSize, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+        }
+    }
+
+    drawClouds() {
+        const numClouds = this.weather === 'rainy' ? 8 : 5;
+        const animOffset = this.animateSky ? this.skyAnimationTime * 20 : 0;
+        
+        for (let i = 0; i < numClouds; i++) {
+            const seed = i * 123.456;
+            const x = ((seed * 50 + animOffset) % (this.canvas.width + 200)) - 100;
+            const y = (seed * 30) % (this.canvas.height * 0.4);
+            const size = 40 + (seed * 20) % 40;
+            
+            this.drawCloud(x, y, size);
+        }
+    }
+
+    drawCloud(x, y, size) {
+        const opacity = this.weather === 'rainy' ? 0.8 : 0.6;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        
+        // Draw cloud as several circles
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+        this.ctx.arc(x + size * 0.5, y, size * 0.6, 0, Math.PI * 2);
+        this.ctx.arc(x + size, y, size * 0.5, 0, Math.PI * 2);
+        this.ctx.arc(x + size * 0.5, y - size * 0.3, size * 0.5, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawRain() {
+        const numDrops = 50;
+        const animOffset = this.animateSky ? this.skyAnimationTime * 100 : 0;
+        
+        this.ctx.strokeStyle = 'rgba(200, 220, 255, 0.5)';
+        this.ctx.lineWidth = 1;
+        
+        for (let i = 0; i < numDrops; i++) {
+            const seed = i * 234.567;
+            const x = (seed * 100) % this.canvas.width;
+            const y = ((seed * 150 + animOffset) % (this.canvas.height + 100)) - 50;
+            
+            this.ctx.beginPath();
+            this.ctx.moveTo(x, y);
+            this.ctx.lineTo(x - 2, y + 10);
+            this.ctx.stroke();
         }
     }
 
@@ -264,12 +637,12 @@ class CityGenerator {
                 const posY = y * cellSize;
 
                 // Draw cell with deterministic color variance based on position
-                const variance = cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park' ? 20 : 0;
+                const variance = cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park' && cell.type !== 'water' ? 20 : 0;
                 this.ctx.fillStyle = this.getCellColor(cell, variance, x, y);
                 this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
 
                 // Add lighting and shader effects for buildings
-                if (cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park') {
+                if (cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park' && cell.type !== 'water') {
                     // Add directional lighting from top-left
                     const lightGradient = this.ctx.createLinearGradient(posX, posY, posX + cellSize, posY + cellSize);
                     lightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
@@ -293,6 +666,23 @@ class CityGenerator {
                     parkGradient.addColorStop(1, 'rgba(34, 139, 69, 0.8)');
                     this.ctx.fillStyle = parkGradient;
                     this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
+                }
+                
+                // Add water effects (waves/shimmer)
+                if (cell.type === 'water') {
+                    const waterGradient = this.ctx.createLinearGradient(posX, posY, posX + cellSize, posY + cellSize);
+                    waterGradient.addColorStop(0, 'rgba(255, 255, 255, 0.2)');
+                    waterGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0)');
+                    waterGradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+                    this.ctx.fillStyle = waterGradient;
+                    this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
+                    
+                    // Add animated ripples if animation is enabled
+                    if (this.animateSky) {
+                        const ripplePhase = (this.skyAnimationTime + x * 0.1 + y * 0.1) % 1;
+                        this.ctx.fillStyle = `rgba(255, 255, 255, ${0.1 * Math.sin(ripplePhase * Math.PI * 2)})`;
+                        this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
+                    }
                 }
             }
         }
@@ -319,10 +709,6 @@ class CityGenerator {
         const isoScaleX = 0.866; // cos(30°)
         const isoScaleY = 0.5;   // sin(30°)
 
-        // Clear with a background
-        this.ctx.fillStyle = '#e2e8f0';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
         // Draw from back to front for proper layering
         for (let y = this.gridSize - 1; y >= 0; y--) {
             for (let x = 0; x < this.gridSize; x++) {
@@ -342,6 +728,10 @@ class CityGenerator {
                     this.drawIsoTile(drawX, drawY, cellSize, '#cbd5e0', 0);
                 } else if (cell.type === 'park') {
                     this.drawIsoTile(drawX, drawY, cellSize, '#48bb78', 0);
+                } else if (cell.type === 'water') {
+                    // Draw water with shimmer effect
+                    const waterColor = this.getCellColor(cell, 0, x, y);
+                    this.drawIsoWater(drawX, drawY, cellSize, waterColor);
                 } else if (cell.type === 'empty') {
                     this.drawIsoTile(drawX, drawY, cellSize, '#e2e8f0', 0);
                 } else {
@@ -353,6 +743,33 @@ class CityGenerator {
                 }
             }
         }
+    }
+
+    drawIsoWater(x, y, size, color) {
+        const w = size * 0.866;
+        const h = size * 0.5;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(x + w, y + h);
+        this.ctx.lineTo(x, y + h * 2);
+        this.ctx.lineTo(x - w, y + h);
+        this.ctx.closePath();
+
+        this.ctx.fillStyle = color;
+        this.ctx.fill();
+        
+        // Add water shimmer effect
+        const shimmerGradient = this.ctx.createLinearGradient(x - w, y, x + w, y + h * 2);
+        shimmerGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        shimmerGradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+        shimmerGradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+        this.ctx.fillStyle = shimmerGradient;
+        this.ctx.fill();
+        
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.lineWidth = 1;
+        this.ctx.stroke();
     }
 
     drawIsoTile(x, y, size, color, height) {
@@ -478,6 +895,16 @@ class CityGenerator {
             case 'road': 
                 baseColor = '#cbd5e0';
                 break;
+            case 'water':
+                // Different shades of blue for different water types
+                if (cell.waterType === 'ocean') {
+                    baseColor = '#1e40af';
+                } else if (cell.waterType === 'river') {
+                    baseColor = '#2563eb';
+                } else {
+                    baseColor = '#3b82f6';
+                }
+                break;
             case 'empty': 
                 baseColor = '#e2e8f0';
                 break;
@@ -486,7 +913,7 @@ class CityGenerator {
         }
         
         // Add deterministic color variance to make buildings look unique
-        if (variance !== 0 && cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park') {
+        if (variance !== 0 && cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park' && cell.type !== 'water') {
             return this.varyColor(baseColor, variance, x, y);
         }
         
