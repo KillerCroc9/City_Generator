@@ -819,14 +819,6 @@ class CityGenerator {
         const baseSize = Math.min(this.canvas.width, this.canvas.height) / this.gridSize;
         const cellSize = baseSize * this.camera.zoom;
         
-        // Calculate rotation in radians
-        const rotY = this.camera.rotationY * Math.PI / 180;
-        
-        // Isometric scale factors adjusted by rotation
-        const isoScaleX = Math.cos(rotY) * 0.866;
-        const isoScaleY = Math.sin(rotY) * 0.866;
-        const isoScaleZ = 0.5;
-        
         // Set cursor style
         this.canvas.style.cursor = 'grab';
         
@@ -950,10 +942,9 @@ class CityGenerator {
         const w = size * 0.866;
         const h = size * 0.5;
 
-        // Calculate dynamic lighting based on camera angle and position
+        // Calculate dynamic lighting based on camera angle
         const lightAngle = this.camera.rotationY * Math.PI / 180;
         const lightX = Math.cos(lightAngle);
-        const lightY = Math.sin(lightAngle);
         
         // Calculate how much each face is lit
         const topBrightness = 30;
@@ -1054,7 +1045,6 @@ class CityGenerator {
         
         // Determine if windows should be lit based on time of day
         const isNight = this.timeOfDay < 6 || this.timeOfDay > 18;
-        const windowLit = isNight ? Math.random() > 0.3 : Math.random() > 0.8;
         
         // Draw windows on right face
         for (let floor = 1; floor < numFloors; floor++) {
@@ -1064,7 +1054,10 @@ class CityGenerator {
             for (let win = 0; win < numWindows; win++) {
                 const winX = x + (win + 0.5) * windowSpacing - w / 2;
                 
-                this.ctx.fillStyle = windowLit && Math.random() > 0.5 ? 
+                // Per-window lighting randomization
+                const windowLit = isNight ? Math.random() > 0.3 : Math.random() > 0.8;
+                
+                this.ctx.fillStyle = windowLit ? 
                     'rgba(255, 220, 100, 0.8)' : 
                     'rgba(50, 50, 80, 0.6)';
                 this.ctx.fillRect(winX, floorY, windowSize, windowSize);
