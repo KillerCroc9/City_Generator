@@ -7,6 +7,15 @@ class CityGenerator {
     // Constants for 3D rendering
     static HEIGHT_BASE_MULTIPLIER = 0.4;
     static HEIGHT_TILT_MULTIPLIER = 0.3;
+    static ZOOM_SPEED = 0.001;
+    
+    // Constants for building windows
+    static WINDOW_SIZE = 2;
+    static WINDOW_SPACING = 8;
+    static WINDOW_SEED_PRIME_X = 73;
+    static WINDOW_SEED_PRIME_Y = 149;
+    static WINDOW_SEED_PRIME_FLOOR = 37;
+    static WINDOW_SEED_PRIME_WIN = 19;
     
     constructor() {
         this.canvas = document.getElementById('cityCanvas');
@@ -160,8 +169,7 @@ class CityGenerator {
         if (this.viewMode !== '3d' || !this.cityData) return;
         e.preventDefault();
         
-        const zoomSpeed = 0.001;
-        const delta = e.deltaY * zoomSpeed;
+        const delta = e.deltaY * CityGenerator.ZOOM_SPEED;
         this.camera.zoom = Math.max(0.3, Math.min(3.0, this.camera.zoom - delta));
         
         this.renderCity();
@@ -1044,30 +1052,31 @@ class CityGenerator {
     }
     
     drawBuildingWindows(x, y, w, h, height) {
-        const windowSize = 2;
-        const windowSpacing = 8;
-        const numFloors = Math.floor(height / windowSpacing);
+        const numFloors = Math.floor(height / CityGenerator.WINDOW_SPACING);
         
         // Determine if windows should be lit based on time of day
         const isNight = this.timeOfDay < 6 || this.timeOfDay > 18;
         
         // Draw windows on right face
         for (let floor = 1; floor < numFloors; floor++) {
-            const floorY = y + h * 2 - floor * windowSpacing;
-            const numWindows = Math.floor(w / windowSpacing);
+            const floorY = y + h * 2 - floor * CityGenerator.WINDOW_SPACING;
+            const numWindows = Math.floor(w / CityGenerator.WINDOW_SPACING);
             
             for (let win = 0; win < numWindows; win++) {
-                const winX = x + (win + 0.5) * windowSpacing - w / 2;
+                const winX = x + (win + 0.5) * CityGenerator.WINDOW_SPACING - w / 2;
                 
                 // Deterministic window lighting based on position
-                const seed = (x * 73 + y * 149 + floor * 37 + win * 19) % 1000;
+                const seed = (x * CityGenerator.WINDOW_SEED_PRIME_X + 
+                             y * CityGenerator.WINDOW_SEED_PRIME_Y + 
+                             floor * CityGenerator.WINDOW_SEED_PRIME_FLOOR + 
+                             win * CityGenerator.WINDOW_SEED_PRIME_WIN) % 1000;
                 const rand = Math.sin(seed * 0.1) * 0.5 + 0.5;
                 const windowLit = isNight ? rand > 0.3 : rand > 0.8;
                 
                 this.ctx.fillStyle = windowLit ? 
                     'rgba(255, 220, 100, 0.8)' : 
                     'rgba(50, 50, 80, 0.6)';
-                this.ctx.fillRect(winX, floorY, windowSize, windowSize);
+                this.ctx.fillRect(winX, floorY, CityGenerator.WINDOW_SIZE, CityGenerator.WINDOW_SIZE);
             }
         }
     }
