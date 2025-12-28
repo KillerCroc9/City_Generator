@@ -4,6 +4,10 @@ class CityGenerator {
     static COLOR_HASH_PRIME_X = 73;
     static COLOR_HASH_PRIME_Y = 149;
     
+    // Constants for 3D rendering
+    static HEIGHT_BASE_MULTIPLIER = 0.4;
+    static HEIGHT_TILT_MULTIPLIER = 0.3;
+    
     constructor() {
         this.canvas = document.getElementById('cityCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -864,7 +868,8 @@ class CityGenerator {
                 const variance = 20;
                 const color = this.getCellColor(cell, variance, x, y);
                 // Enhanced height calculation with camera tilt effect
-                const heightMultiplier = 0.4 + (this.camera.rotationX / 90) * 0.3;
+                const heightMultiplier = CityGenerator.HEIGHT_BASE_MULTIPLIER + 
+                    (this.camera.rotationX / 90) * CityGenerator.HEIGHT_TILT_MULTIPLIER;
                 const height = cell.height * cellSize * heightMultiplier;
                 this.drawIsoBuilding(drawX, drawY, cellSize, color, height, x, y);
             }
@@ -1034,11 +1039,11 @@ class CityGenerator {
         
         // Add windows for taller buildings
         if (height > size * 0.5) {
-            this.drawBuildingWindows(x, y, w, h, height, topColor);
+            this.drawBuildingWindows(x, y, w, h, height);
         }
     }
     
-    drawBuildingWindows(x, y, w, h, height, buildingColor) {
+    drawBuildingWindows(x, y, w, h, height) {
         const windowSize = 2;
         const windowSpacing = 8;
         const numFloors = Math.floor(height / windowSpacing);
@@ -1054,8 +1059,10 @@ class CityGenerator {
             for (let win = 0; win < numWindows; win++) {
                 const winX = x + (win + 0.5) * windowSpacing - w / 2;
                 
-                // Per-window lighting randomization
-                const windowLit = isNight ? Math.random() > 0.3 : Math.random() > 0.8;
+                // Deterministic window lighting based on position
+                const seed = (x * 73 + y * 149 + floor * 37 + win * 19) % 1000;
+                const rand = Math.sin(seed * 0.1) * 0.5 + 0.5;
+                const windowLit = isNight ? rand > 0.3 : rand > 0.8;
                 
                 this.ctx.fillStyle = windowLit ? 
                     'rgba(255, 220, 100, 0.8)' : 
