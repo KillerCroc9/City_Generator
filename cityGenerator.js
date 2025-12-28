@@ -409,14 +409,19 @@ class CityGenerator {
                             row.push({ type: 'empty', height: 0 });
                         }
                     } else {
-                        // Building
+                        // Building - normalize probabilities to sum to 1
                         const buildingRand = Math.random();
                         let type, height;
+                        
+                        // Calculate normalized probabilities
+                        // Ensure skyscrapers get their proper ratio, then split remaining between commercial and residential
+                        const commercialRatio = 0.3; // 30% of buildings should be commercial
+                        const residentialRatio = 1 - skyscraperRatio - commercialRatio;
                         
                         if (buildingRand < skyscraperRatio) {
                             type = 'skyscraper';
                             height = Math.floor(avgHeight * 1.5 + Math.random() * avgHeight);
-                        } else if (buildingRand < skyscraperRatio + 0.2) {
+                        } else if (buildingRand < skyscraperRatio + commercialRatio) {
                             type = 'commercial';
                             height = Math.floor(avgHeight * 0.8 + Math.random() * 2);
                         } else {
