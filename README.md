@@ -6,7 +6,12 @@ A web-based city generator that creates unique 2D/3D city layouts based on real-
 
 - **Prompt-Based Generation**: Enter city names like "New York", "Texas", "Tokyo", etc., and get cities with characteristics matching those locations
 - **2D Grid View**: Top-down view showing the city layout as a grid
-- **3D Isometric View**: Enhanced pseudo-3D isometric projection showing building heights with improved lighting and shadows
+- **Enhanced 3D Isometric View**: Interactive 3D view with advanced camera controls
+  - **Interactive Camera Controls**: Drag to rotate, scroll to zoom
+  - **Camera Presets**: Quick access to Default, Aerial, Ground Level, and Side views
+  - **Dynamic Lighting**: Buildings are lit based on camera angle for realistic depth
+  - **Building Windows**: Tall buildings feature lit windows that vary with time of day
+  - **Improved Depth Perception**: Better scaling and perspective for an immersive 3D experience
 - **Ultra Dynamic Sky System**: 
   - Real-time day/night cycle with time-based sky colors
   - Animated sun and moon with realistic positioning
@@ -61,14 +66,22 @@ A web-based city generator that creates unique 2D/3D city layouts based on real-
 2. Enter a city name or descriptor in the input field
 3. Click "Generate City" or press Enter
 4. Toggle between 2D and 3D views
-5. Adjust the grid size slider to change city dimensions
-6. **Explore Advanced Options**:
+5. **In 3D View**:
+   - **Drag** with your mouse to rotate the camera around the city
+   - **Scroll** your mouse wheel to zoom in and out
+   - Use the **camera preset buttons** for quick angle changes:
+     - **Default View**: Standard isometric perspective
+     - **Aerial View**: Bird's eye view from above
+     - **Ground Level**: Street-level perspective
+     - **Side View**: View from the side at 90 degrees
+6. Adjust the grid size slider to change city dimensions
+7. **Explore Advanced Options**:
    - Select different map shapes (Square, Island, Coastal, River)
    - Adjust water amount with the slider
    - Change time of day to see different sky colors
    - Toggle sky animation on/off
    - Select weather conditions (Clear, Cloudy, Rainy)
-7. Try different prompts to see how cities vary!
+8. Try different prompts to see how cities vary!
 
 ## Technical Details
 
@@ -76,7 +89,10 @@ A web-based city generator that creates unique 2D/3D city layouts based on real-
 - HTML5 Canvas for rendering
 - Responsive design
 - Procedural generation algorithm
-- Isometric projection for 3D view
+- Interactive 3D isometric projection with camera controls
+- Mouse-based camera manipulation (drag to rotate, scroll to zoom)
+- Dynamic lighting system based on camera angle
+- Depth sorting for proper 3D rendering
 
 ## Building & Terrain Types
 

@@ -4,6 +4,19 @@ class CityGenerator {
     static COLOR_HASH_PRIME_X = 73;
     static COLOR_HASH_PRIME_Y = 149;
     
+    // Constants for 3D rendering
+    static HEIGHT_BASE_MULTIPLIER = 0.4;
+    static HEIGHT_TILT_MULTIPLIER = 0.3;
+    static ZOOM_SPEED = 0.001;
+    
+    // Constants for building windows
+    static WINDOW_SIZE = 2;
+    static WINDOW_SPACING = 8;
+    static WINDOW_SEED_PRIME_X = 73;
+    static WINDOW_SEED_PRIME_Y = 149;
+    static WINDOW_SEED_PRIME_FLOOR = 37;
+    static WINDOW_SEED_PRIME_WIN = 19;
+    
     constructor() {
         this.canvas = document.getElementById('cityCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -22,6 +35,18 @@ class CityGenerator {
         this.skyAnimationTime = 0;
         this.animationFrame = null;
         
+        // 3D camera properties
+        this.camera = {
+            rotationX: 30, // Vertical tilt angle (degrees)
+            rotationY: 45, // Horizontal rotation angle (degrees)
+            zoom: 1.0,
+            offsetX: 0,
+            offsetY: 0
+        };
+        this.isDragging = false;
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+        
         this.init();
     }
 
@@ -35,6 +60,15 @@ class CityGenerator {
         document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 this.viewMode = e.target.value;
+                
+                // Show/hide camera controls
+                const cameraControls = document.getElementById('cameraControls');
+                if (this.viewMode === '3d') {
+                    cameraControls.classList.remove('hidden');
+                } else {
+                    cameraControls.classList.add('hidden');
+                }
+                
                 if (this.cityData) this.renderCity();
             });
         });
@@ -82,9 +116,98 @@ class CityGenerator {
             this.weather = e.target.value;
             if (this.cityData) this.renderCity();
         });
+        
+        // Camera preset buttons
+        document.querySelectorAll('.camera-preset').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const preset = e.target.dataset.preset;
+                this.applyCameraPreset(preset);
+            });
+        });
 
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
+        
+        // 3D view controls
+        this.canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
+        this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+        this.canvas.addEventListener('mouseup', () => this.onMouseUp());
+        this.canvas.addEventListener('mouseleave', () => this.onMouseUp());
+        this.canvas.addEventListener('wheel', (e) => this.onWheel(e));
+    }
+    
+    onMouseDown(e) {
+        if (this.viewMode !== '3d') return;
+        this.isDragging = true;
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+        this.canvas.style.cursor = 'grabbing';
+    }
+    
+    onMouseMove(e) {
+        if (this.viewMode !== '3d' || !this.isDragging) return;
+        
+        const deltaX = e.clientX - this.lastMouseX;
+        const deltaY = e.clientY - this.lastMouseY;
+        
+        this.camera.rotationY += deltaX * 0.5;
+        this.camera.rotationX = Math.max(0, Math.min(90, this.camera.rotationX - deltaY * 0.5));
+        
+        this.lastMouseX = e.clientX;
+        this.lastMouseY = e.clientY;
+        
+        if (this.cityData) this.renderCity();
+    }
+    
+    onMouseUp() {
+        if (this.viewMode !== '3d') return;
+        this.isDragging = false;
+        this.canvas.style.cursor = this.viewMode === '3d' ? 'grab' : 'default';
+    }
+    
+    onWheel(e) {
+        if (this.viewMode !== '3d' || !this.cityData) return;
+        e.preventDefault();
+        
+        const delta = e.deltaY * CityGenerator.ZOOM_SPEED;
+        this.camera.zoom = Math.max(0.3, Math.min(3.0, this.camera.zoom - delta));
+        
+        this.renderCity();
+    }
+    
+    applyCameraPreset(preset) {
+        switch (preset) {
+            case 'default':
+                this.camera.rotationX = 30;
+                this.camera.rotationY = 45;
+                this.camera.zoom = 1.0;
+                this.camera.offsetX = 0;
+                this.camera.offsetY = 0;
+                break;
+            case 'aerial':
+                this.camera.rotationX = 60;
+                this.camera.rotationY = 45;
+                this.camera.zoom = 1.2;
+                this.camera.offsetX = 0;
+                this.camera.offsetY = -50;
+                break;
+            case 'ground':
+                this.camera.rotationX = 15;
+                this.camera.rotationY = 45;
+                this.camera.zoom = 1.5;
+                this.camera.offsetX = 0;
+                this.camera.offsetY = 50;
+                break;
+            case 'side':
+                this.camera.rotationX = 30;
+                this.camera.rotationY = 90;
+                this.camera.zoom = 1.1;
+                this.camera.offsetX = 0;
+                this.camera.offsetY = 0;
+                break;
+        }
+        
+        if (this.cityData) this.renderCity();
     }
 
     resizeCanvas() {
@@ -705,44 +828,82 @@ class CityGenerator {
     }
 
     render3D() {
-        const cellSize = this.canvas.width / this.gridSize;
-        const isoScaleX = 0.866; // cos(30°)
-        const isoScaleY = 0.5;   // sin(30°)
-
-        // Draw from back to front for proper layering
-        for (let y = this.gridSize - 1; y >= 0; y--) {
+        const baseSize = Math.min(this.canvas.width, this.canvas.height) / this.gridSize;
+        const cellSize = baseSize * this.camera.zoom;
+        
+        // Set cursor style
+        this.canvas.style.cursor = 'grab';
+        
+        // Create array of all cells with their positions for depth sorting
+        const cells = [];
+        for (let y = 0; y < this.gridSize; y++) {
             for (let x = 0; x < this.gridSize; x++) {
                 const cell = this.cityData[y][x];
                 
-                // Calculate isometric position
-                const isoX = (x - y) * cellSize * isoScaleX;
-                const isoY = (x + y) * cellSize * isoScaleY;
+                // Calculate 3D position
+                const isoX = (x - y) * cellSize * 0.866;
+                const isoY = (x + y) * cellSize * 0.5;
                 
-                // Center the view
-                const centerX = this.canvas.width / 2;
-                const centerY = this.canvas.height / 4;
+                // Apply camera offset
+                const centerX = this.canvas.width / 2 + this.camera.offsetX;
+                const centerY = this.canvas.height / 3 + this.camera.offsetY;
+                
                 const drawX = centerX + isoX;
                 const drawY = centerY + isoY;
-
-                if (cell.type === 'road') {
-                    this.drawIsoTile(drawX, drawY, cellSize, '#cbd5e0', 0);
-                } else if (cell.type === 'park') {
-                    this.drawIsoTile(drawX, drawY, cellSize, '#48bb78', 0);
-                } else if (cell.type === 'water') {
-                    // Draw water with shimmer effect
-                    const waterColor = this.getCellColor(cell, 0, x, y);
-                    this.drawIsoWater(drawX, drawY, cellSize, waterColor);
-                } else if (cell.type === 'empty') {
-                    this.drawIsoTile(drawX, drawY, cellSize, '#e2e8f0', 0);
-                } else {
-                    // Draw building with height and lighting
-                    const variance = 20;
-                    const color = this.getCellColor(cell, variance, x, y);
-                    const height = cell.height * cellSize * 0.3;
-                    this.drawIsoBuilding(drawX, drawY, cellSize, color, height);
-                }
+                
+                // Calculate depth for sorting (further back = drawn first)
+                const depth = x + y + (cell.height || 0) * 0.1;
+                
+                cells.push({ x, y, cell, drawX, drawY, depth });
             }
         }
+        
+        // Sort by depth (back to front)
+        cells.sort((a, b) => b.depth - a.depth);
+        
+        // Draw all cells
+        for (const { x, y, cell, drawX, drawY } of cells) {
+            if (cell.type === 'road') {
+                this.drawIsoTile(drawX, drawY, cellSize, '#cbd5e0', 0);
+            } else if (cell.type === 'park') {
+                this.drawIsoTile(drawX, drawY, cellSize, '#48bb78', 0);
+            } else if (cell.type === 'water') {
+                const waterColor = this.getCellColor(cell, 0, x, y);
+                this.drawIsoWater(drawX, drawY, cellSize, waterColor);
+            } else if (cell.type === 'empty') {
+                this.drawIsoTile(drawX, drawY, cellSize, '#e2e8f0', 0);
+            } else {
+                const variance = 20;
+                const color = this.getCellColor(cell, variance, x, y);
+                // Enhanced height calculation with camera tilt effect
+                const heightMultiplier = CityGenerator.HEIGHT_BASE_MULTIPLIER + 
+                    (this.camera.rotationX / 90) * CityGenerator.HEIGHT_TILT_MULTIPLIER;
+                const height = cell.height * cellSize * heightMultiplier;
+                this.drawIsoBuilding(drawX, drawY, cellSize, color, height, x, y);
+            }
+        }
+        
+        // Draw 3D controls hint
+        this.draw3DControlsHint();
+    }
+    
+    draw3DControlsHint() {
+        const padding = 10;
+        const text = '🖱️ Drag to rotate • Scroll to zoom';
+        
+        this.ctx.save();
+        this.ctx.font = '14px "Segoe UI", sans-serif';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.lineWidth = 3;
+        
+        const textWidth = this.ctx.measureText(text).width;
+        const x = this.canvas.width - textWidth - padding;
+        const y = this.canvas.height - padding;
+        
+        this.ctx.strokeText(text, x, y);
+        this.ctx.fillText(text, x, y);
+        this.ctx.restore();
     }
 
     drawIsoWater(x, y, size, color) {
@@ -790,9 +951,18 @@ class CityGenerator {
         this.ctx.stroke();
     }
 
-    drawIsoBuilding(x, y, size, color, height) {
+    drawIsoBuilding(x, y, size, color, height, gridX, gridY) {
         const w = size * 0.866;
         const h = size * 0.5;
+
+        // Calculate dynamic lighting based on camera angle
+        const lightAngle = this.camera.rotationY * Math.PI / 180;
+        const lightX = Math.cos(lightAngle);
+        
+        // Calculate how much each face is lit
+        const topBrightness = 30;
+        const rightBrightness = Math.max(-15, Math.min(15, lightX * 20));
+        const leftBrightness = Math.max(-25, Math.min(5, -lightX * 20 - 10));
 
         // Top face with lighting
         this.ctx.beginPath();
@@ -803,7 +973,7 @@ class CityGenerator {
         this.ctx.closePath();
         
         // Brighten top face (receives most light)
-        const topColor = this.lightenColor(color, 30);
+        const topColor = this.lightenColor(color, topBrightness);
         this.ctx.fillStyle = topColor;
         this.ctx.fill();
         
@@ -818,7 +988,7 @@ class CityGenerator {
         this.ctx.lineWidth = 1;
         this.ctx.stroke();
 
-        // Right face - medium lighting (facing right/forward)
+        // Right face - lighting depends on camera angle
         this.ctx.beginPath();
         this.ctx.moveTo(x + w, y + h - height);
         this.ctx.lineTo(x + w, y + h);
@@ -826,8 +996,9 @@ class CityGenerator {
         this.ctx.lineTo(x, y + h * 2 - height);
         this.ctx.closePath();
         
-        // Medium brightness for right face
-        const rightColor = this.darkenColor(color, 5);
+        const rightColor = rightBrightness >= 0 ? 
+            this.lightenColor(color, rightBrightness) : 
+            this.darkenColor(color, -rightBrightness);
         this.ctx.fillStyle = rightColor;
         this.ctx.fill();
         
@@ -840,7 +1011,7 @@ class CityGenerator {
         
         this.ctx.stroke();
 
-        // Left face - darkest (in shadow)
+        // Left face - lighting depends on camera angle
         this.ctx.beginPath();
         this.ctx.moveTo(x - w, y + h - height);
         this.ctx.lineTo(x - w, y + h);
@@ -848,8 +1019,9 @@ class CityGenerator {
         this.ctx.lineTo(x, y + h * 2 - height);
         this.ctx.closePath();
         
-        // Darken left face (in shadow)
-        const leftColor = this.darkenColor(color, 25);
+        const leftColor = leftBrightness >= 0 ?
+            this.lightenColor(color, leftBrightness) :
+            this.darkenColor(color, -leftBrightness);
         this.ctx.fillStyle = leftColor;
         this.ctx.fill();
         
@@ -862,15 +1034,51 @@ class CityGenerator {
         
         this.ctx.stroke();
         
-        // Add ambient occlusion at the base
+        // Add ambient occlusion at the base with size depending on height
+        const aoSize = Math.min(1, height / (size * 2));
         const aoGradient = this.ctx.createRadialGradient(x, y + h * 2, 0, x, y + h * 2, w);
-        aoGradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+        aoGradient.addColorStop(0, `rgba(0, 0, 0, ${0.3 * aoSize})`);
         aoGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
         
         this.ctx.beginPath();
         this.ctx.ellipse(x, y + h * 2, w * 0.8, h * 0.8, 0, 0, Math.PI * 2);
         this.ctx.fillStyle = aoGradient;
         this.ctx.fill();
+        
+        // Add windows for taller buildings
+        if (height > size * 0.5) {
+            this.drawBuildingWindows(x, y, w, h, height);
+        }
+    }
+    
+    drawBuildingWindows(x, y, w, h, height) {
+        const numFloors = Math.floor(height / CityGenerator.WINDOW_SPACING);
+        
+        // Determine if windows should be lit based on time of day
+        const isNight = this.timeOfDay < 6 || this.timeOfDay > 18;
+        
+        // Draw windows on right face
+        for (let floor = 1; floor < numFloors; floor++) {
+            const floorY = y + h * 2 - floor * CityGenerator.WINDOW_SPACING;
+            const numWindows = Math.floor(w / CityGenerator.WINDOW_SPACING);
+            
+            for (let win = 0; win < numWindows; win++) {
+                const winX = x + (win + 0.5) * CityGenerator.WINDOW_SPACING - w / 2;
+                
+                // Deterministic window lighting based on position
+                const seed = (x * CityGenerator.WINDOW_SEED_PRIME_X + 
+                             y * CityGenerator.WINDOW_SEED_PRIME_Y + 
+                             floor * CityGenerator.WINDOW_SEED_PRIME_FLOOR + 
+                             win * CityGenerator.WINDOW_SEED_PRIME_WIN) % 1000;
+                const rand = Math.sin(seed * 0.1) * 0.5 + 0.5;
+                const windowLit = isNight ? rand > 0.3 : rand > 0.8;
+                
+                this.ctx.fillStyle = windowLit ? 
+                    'rgba(255, 220, 100, 0.8)' : 
+                    'rgba(50, 50, 80, 0.6)';
+                this.ctx.fillRect(winX, floorY, CityGenerator.WINDOW_SIZE, CityGenerator.WINDOW_SIZE);
+            }
+        }
     }
 
     getCellColor(cell, variance = 0, x = 0, y = 0) {
