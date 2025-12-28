@@ -258,16 +258,36 @@ class CityGenerator {
                 const posX = x * cellSize;
                 const posY = y * cellSize;
 
-                // Draw cell
-                this.ctx.fillStyle = this.getCellColor(cell);
+                // Draw cell with color variance
+                const variance = cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park' ? 20 : 0;
+                this.ctx.fillStyle = this.getCellColor(cell, variance);
                 this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
 
-                // Add some detail for buildings
+                // Add lighting and shader effects for buildings
                 if (cell.type !== 'road' && cell.type !== 'empty' && cell.type !== 'park') {
-                    // Add height indicator
+                    // Add directional lighting from top-left
+                    const lightGradient = this.ctx.createLinearGradient(posX, posY, posX + cellSize, posY + cellSize);
+                    lightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+                    lightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+                    this.ctx.fillStyle = lightGradient;
+                    this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
+                    
+                    // Add height indicator with better visibility
                     const heightRatio = Math.min(cell.height / 10, 1);
-                    this.ctx.fillStyle = `rgba(255, 255, 255, ${heightRatio * 0.3})`;
+                    this.ctx.fillStyle = `rgba(255, 255, 255, ${heightRatio * 0.2})`;
                     this.ctx.fillRect(posX + 2, posY + 2, cellSize - 5, cellSize - 5);
+                }
+                
+                // Add subtle shadow for parks
+                if (cell.type === 'park') {
+                    const parkGradient = this.ctx.createRadialGradient(
+                        posX + cellSize / 2, posY + cellSize / 2, 0,
+                        posX + cellSize / 2, posY + cellSize / 2, cellSize / 2
+                    );
+                    parkGradient.addColorStop(0, 'rgba(72, 187, 120, 0.8)');
+                    parkGradient.addColorStop(1, 'rgba(34, 139, 69, 0.8)');
+                    this.ctx.fillStyle = parkGradient;
+                    this.ctx.fillRect(posX, posY, cellSize - 1, cellSize - 1);
                 }
             }
         }
@@ -320,8 +340,9 @@ class CityGenerator {
                 } else if (cell.type === 'empty') {
                     this.drawIsoTile(drawX, drawY, cellSize, '#e2e8f0', 0);
                 } else {
-                    // Draw building with height
-                    const color = this.getCellColor(cell);
+                    // Draw building with height and lighting
+                    const variance = 20;
+                    const color = this.getCellColor(cell, variance);
                     const height = cell.height * cellSize * 0.3;
                     this.drawIsoBuilding(drawX, drawY, cellSize, color, height);
                 }
@@ -351,7 +372,7 @@ class CityGenerator {
         const w = size * 0.866;
         const h = size * 0.5;
 
-        // Top face
+        // Top face with lighting
         this.ctx.beginPath();
         this.ctx.moveTo(x, y - height);
         this.ctx.lineTo(x + w, y + h - height);
@@ -359,13 +380,23 @@ class CityGenerator {
         this.ctx.lineTo(x - w, y + h - height);
         this.ctx.closePath();
         
-        this.ctx.fillStyle = this.lightenColor(color, 20);
+        // Brighten top face (receives most light)
+        const topColor = this.lightenColor(color, 30);
+        this.ctx.fillStyle = topColor;
         this.ctx.fill();
+        
+        // Add subtle gradient for realism
+        const topGradient = this.ctx.createLinearGradient(x - w, y + h - height, x + w, y + h - height);
+        topGradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+        topGradient.addColorStop(1, 'rgba(0, 0, 0, 0.05)');
+        this.ctx.fillStyle = topGradient;
+        this.ctx.fill();
+        
         this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
         this.ctx.lineWidth = 1;
         this.ctx.stroke();
 
-        // Right face
+        // Right face - medium lighting (facing right/forward)
         this.ctx.beginPath();
         this.ctx.moveTo(x + w, y + h - height);
         this.ctx.lineTo(x + w, y + h);
@@ -373,11 +404,21 @@ class CityGenerator {
         this.ctx.lineTo(x, y + h * 2 - height);
         this.ctx.closePath();
         
-        this.ctx.fillStyle = this.darkenColor(color, 10);
+        // Medium brightness for right face
+        const rightColor = this.darkenColor(color, 5);
+        this.ctx.fillStyle = rightColor;
         this.ctx.fill();
+        
+        // Add vertical gradient for depth
+        const rightGradient = this.ctx.createLinearGradient(x, y + h - height, x, y + h * 2);
+        rightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.08)');
+        rightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.15)');
+        this.ctx.fillStyle = rightGradient;
+        this.ctx.fill();
+        
         this.ctx.stroke();
 
-        // Left face
+        // Left face - darkest (in shadow)
         this.ctx.beginPath();
         this.ctx.moveTo(x - w, y + h - height);
         this.ctx.lineTo(x - w, y + h);
@@ -385,21 +426,74 @@ class CityGenerator {
         this.ctx.lineTo(x, y + h * 2 - height);
         this.ctx.closePath();
         
-        this.ctx.fillStyle = this.darkenColor(color, 20);
+        // Darken left face (in shadow)
+        const leftColor = this.darkenColor(color, 25);
+        this.ctx.fillStyle = leftColor;
         this.ctx.fill();
+        
+        // Add shadow gradient
+        const leftGradient = this.ctx.createLinearGradient(x, y + h - height, x, y + h * 2);
+        leftGradient.addColorStop(0, 'rgba(0, 0, 0, 0.05)');
+        leftGradient.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
+        this.ctx.fillStyle = leftGradient;
+        this.ctx.fill();
+        
         this.ctx.stroke();
+        
+        // Add ambient occlusion at the base
+        const aoGradient = this.ctx.createRadialGradient(x, y + h * 2, 0, x, y + h * 2, w);
+        aoGradient.addColorStop(0, 'rgba(0, 0, 0, 0.3)');
+        aoGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        this.ctx.beginPath();
+        this.ctx.ellipse(x, y + h * 2, w * 0.8, h * 0.8, 0, 0, Math.PI * 2);
+        this.ctx.fillStyle = aoGradient;
+        this.ctx.fill();
     }
 
-    getCellColor(cell) {
+    getCellColor(cell, variance = 0) {
+        let baseColor;
         switch (cell.type) {
-            case 'residential': return '#4a5568';
-            case 'commercial': return '#2d3748';
-            case 'skyscraper': return '#1a202c';
-            case 'park': return '#48bb78';
-            case 'road': return '#cbd5e0';
-            case 'empty': return '#e2e8f0';
-            default: return '#e2e8f0';
+            case 'residential': 
+                // Brown/warm tones for houses
+                baseColor = '#8B6F47';
+                break;
+            case 'commercial': 
+                // Blue-gray for commercial
+                baseColor = '#5A7D9A';
+                break;
+            case 'skyscraper': 
+                // Steel blue/gray for skyscrapers
+                baseColor = '#4A5D6D';
+                break;
+            case 'park': 
+                // Green for parks
+                baseColor = '#48bb78';
+                break;
+            case 'road': 
+                baseColor = '#cbd5e0';
+                break;
+            case 'empty': 
+                baseColor = '#e2e8f0';
+                break;
+            default: 
+                baseColor = '#e2e8f0';
         }
+        
+        // Add color variance to make buildings look unique
+        if (variance !== 0 && cell.type !== 'road' && cell.type !== 'empty') {
+            return this.varyColor(baseColor, variance);
+        }
+        
+        return baseColor;
+    }
+    
+    varyColor(color, variance) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const R = Math.max(0, Math.min(255, (num >> 16) + (Math.random() - 0.5) * variance));
+        const G = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + (Math.random() - 0.5) * variance));
+        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + (Math.random() - 0.5) * variance));
+        return '#' + (0x1000000 + Math.floor(R) * 0x10000 + Math.floor(G) * 0x100 + Math.floor(B)).toString(16).slice(1);
     }
 
     lightenColor(color, percent) {
