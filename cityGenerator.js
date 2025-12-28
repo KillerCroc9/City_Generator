@@ -415,8 +415,10 @@ class CityGenerator {
                         
                         // Calculate normalized probabilities
                         // Ensure skyscrapers get their proper ratio, then split remaining between commercial and residential
-                        const commercialRatio = 0.3; // 30% of buildings should be commercial
-                        const residentialRatio = 1 - skyscraperRatio - commercialRatio;
+                        const baseCommercialRatio = 0.3;
+                        // Adjust commercial ratio if skyscraper ratio is very high
+                        const commercialRatio = Math.min(baseCommercialRatio, Math.max(0.1, 1 - skyscraperRatio - 0.1));
+                        const residentialRatio = Math.max(0, 1 - skyscraperRatio - commercialRatio);
                         
                         if (buildingRand < skyscraperRatio) {
                             type = 'skyscraper';
